@@ -1,0 +1,382 @@
+{
+  "description": "可视化效果注册表 - 所有效果的元数据和参数定义",
+  "version": "1.0.0",
+  "effects": [
+    {
+      "id": "bars",
+      "name": "条形图",
+      "category": "spectrum",
+      "description": "经典频谱条形图 - 从底部升起的彩色柱状频谱",
+      "class_name": "BarsEffect",
+      "params": { "num_bars": 48, "bar_spacing": 2, "max_height_ratio": 0.7 }
+    },
+    {
+      "id": "spikes",
+      "name": "尖峰",
+      "category": "spectrum",
+      "description": "从中心向外辐射的频谱尖峰阵列",
+      "class_name": "SpikesEffect",
+      "params": { "num_spikes": 64, "min_length": 50, "max_length": 150, "inner_radius": 30 }
+    },
+    {
+      "id": "waveform",
+      "name": "波形",
+      "category": "wave",
+      "description": "双波形曲线 - 正弦波和余弦波叠加显示",
+      "class_name": "WaveformEffect",
+      "params": { "num_points": 100, "wave_height_min": 40, "wave_height_max": 100 }
+    },
+    {
+      "id": "vortex",
+      "name": "漩涡",
+      "category": "particle",
+      "description": "旋转的粒子漩涡 - 粒子绕中心旋转扩散",
+      "class_name": "VortexEffect",
+      "params": { "num_particles": 150, "radius_step": 5, "base_radius": 50 }
+    },
+    {
+      "id": "spectrum_circle",
+      "name": "频谱环",
+      "category": "spectrum",
+      "description": "多层同心频谱圆环 - 频谱驱动环状变形",
+      "class_name": "SpectrumCircleEffect",
+      "params": { "num_points": 72, "num_rings": 4, "base_radius": 80, "ring_spacing": 50 }
+    },
+    {
+      "id": "matrix_rain",
+      "name": "矩阵雨",
+      "category": "text",
+      "description": "黑客帝国风格数字雨 - 日文字符下落",
+      "class_name": "MatrixRainEffect",
+      "params": { "num_drops": 60, "drop_speed_base": 5, "drop_speed_energy": 10 }
+    },
+    {
+      "id": "plasma",
+      "name": "等离子",
+      "category": "pattern",
+      "description": "等离子体流动效果 - 正弦波干涉生成色彩",
+      "class_name": "PlasmaEffect",
+      "params": { "step": 15, "energy_influence": 0.2 }
+    },
+    {
+      "id": "waterfall",
+      "name": "瀑布图",
+      "category": "spectrum",
+      "description": "频谱瀑布流 - 底部频谱柱 + 上方瀑布流",
+      "class_name": "WaterfallEffect",
+      "params": { "num_bands": 64, "waterfall_step": 8 }
+    },
+    {
+      "id": "fire",
+      "name": "火焰",
+      "category": "particle",
+      "description": "真实感火焰模拟 - 上升火焰柱",
+      "class_name": "FireEffect",
+      "params": { "cols": 40, "cell_size": 4 }
+    },
+    {
+      "id": "fractal",
+      "name": "分形",
+      "category": "math",
+      "description": "Mandelbrot 分形渲染 - 音频驱动迭代深度",
+      "class_name": "FractalEffect",
+      "params": { "step": 20, "base_max_iter": 10, "depth_mult": 3 }
+    },
+    {
+      "id": "geometric",
+      "name": "几何图案",
+      "category": "geometry",
+      "description": "旋转几何形状（三角/方形/圆形）交替显示",
+      "class_name": "GeometricEffect",
+      "params": { "num_shapes": 8, "base_radius": 100, "size_base": 30 }
+    },
+    {
+      "id": "sonar",
+      "name": "声纳",
+      "category": "particle",
+      "description": "声纳扫描效果 - 旋转雷达 + 探测脉冲",
+      "class_name": "SonarEffect",
+      "params": { "ping_probability": 0.1, "max_radius": 400, "ring_spacing": 80 }
+    },
+    {
+      "id": "spectrum_rays",
+      "name": "频谱射线",
+      "category": "spectrum",
+      "description": "从中心向外发射的频谱渐变射线",
+      "class_name": "SpectrumRaysEffect",
+      "params": { "num_rays": 32, "inner_radius": 80, "outer_radius_base": 200, "outer_radius_max": 300 }
+    },
+    {
+      "id": "heart",
+      "name": "跳动的心",
+      "category": "geometry",
+      "description": "随音频跳动的心形图案 - 多层渐变心形",
+      "class_name": "HeartEffect",
+      "params": { "num_layers": 3, "base_scale": 60, "energy_mult": 80 }
+    },
+    {
+      "id": "starfield",
+      "name": "星域",
+      "category": "particle",
+      "description": "3D星域飞越效果 - 星星从中心向外扩散",
+      "class_name": "StarfieldEffect",
+      "params": { "num_stars": 200, "z_range": [0.5, 2.0], "projection_factor": 200 }
+    },
+    {
+      "id": "kaleidoscope",
+      "name": "万花筒",
+      "category": "pattern",
+      "description": "万花筒对称图案 - 多分支旋转",
+      "class_name": "KaleidoscopeEffect",
+      "params": { "num_segments": 8, "num_arms": 3, "arm_spread": 0.3 }
+    },
+    {
+      "id": "spectrum_wave",
+      "name": "频谱波浪",
+      "category": "wave",
+      "description": "多层频谱波浪 - 多条频率驱动的波浪线",
+      "class_name": "SpectrumWaveEffect",
+      "params": { "num_lines": 100, "wave_count": 5, "vertical_spacing": 50 }
+    },
+    {
+      "id": "cube_3d",
+      "name": "3D立方体",
+      "category": "3d",
+      "description": "旋转3D线框立方体 - 音频驱动缩放",
+      "class_name": "Cube3DEffect",
+      "params": { "scale": 150, "rotation_speed_x": 0.5, "rotation_speed_y": 0.7 }
+    },
+    {
+      "id": "spectrum_waves_3d",
+      "name": "3D频谱波浪",
+      "category": "3d",
+      "description": "3D透视频谱波浪网格",
+      "class_name": "SpectrumWaves3DEffect",
+      "params": { "rows": 16, "cols": 32 }
+    },
+    {
+      "id": "audio_moire",
+      "name": "音频莫尔条纹",
+      "category": "pattern",
+      "description": "音频驱动的莫尔干涉条纹图案",
+      "class_name": "AudioMoireEffect",
+      "params": { "step": 8 }
+    },
+    {
+      "id": "spectrum_orb",
+      "name": "频谱球体",
+      "category": "spectrum",
+      "description": "多层频谱椭圆 - 频谱驱动的球形变形",
+      "class_name": "SpectrumOrbEffect",
+      "params": { "layers": 12, "radius_base": 50, "radius_step": 25, "num_vertices": 36 }
+    },
+    {
+      "id": "audio_flower",
+      "name": "音频花朵",
+      "category": "pattern",
+      "description": "绽放的音频花 - 花瓣随频率伸展",
+      "class_name": "AudioFlowerEffect",
+      "params": { "petals": 6, "petal_segments": 50 }
+    },
+    {
+      "id": "spectrum_spiral",
+      "name": "频谱螺旋",
+      "category": "pattern",
+      "description": "频谱驱动的螺旋线 - 频率影响半径",
+      "class_name": "SpectrumSpiralEffect",
+      "params": { "num_points": 200, "turns": 6, "min_radius": 30, "max_radius": 250 }
+    },
+    {
+      "id": "audio_grid",
+      "name": "音频网格",
+      "category": "grid",
+      "description": "音频能量网格 - 每个格点响应对应频段",
+      "class_name": "AudioGridEffect",
+      "params": { "rows": 16, "cols": 24, "size_base": 0.3, "size_range": 0.7 }
+    },
+    {
+      "id": "spectrum_ripples",
+      "name": "频谱涟漪",
+      "category": "particle",
+      "description": "频谱驱动的涟漪扩散 - 不同频段产生不同环",
+      "class_name": "SpectrumRipplesEffect",
+      "params": { "ripple_probability": 0.1, "max_radius": 400, "speed": 2 }
+    },
+    {
+      "id": "audio_maze",
+      "name": "音频迷宫",
+      "category": "grid",
+      "description": "音频驱动的网格迷宫生成",
+      "class_name": "AudioMazeEffect",
+      "params": { "step": 40 }
+    },
+    {
+      "id": "spectrum_pyramid",
+      "name": "频谱金字塔",
+      "category": "geometry",
+      "description": "堆叠的频谱金字塔 - 每层响应一个频段",
+      "class_name": "SpectrumPyramidEffect",
+      "params": { "layers": 10, "height_base": 50, "width_base": 100 }
+    },
+    {
+      "id": "cellular_automaton",
+      "name": "元胞自动机",
+      "category": "math",
+      "description": "Conway生命游戏 - 音频驱动随机扰动",
+      "class_name": "CellularAutomatonEffect",
+      "params": { "grid_w": 48, "grid_h": 27 }
+    },
+    {
+      "id": "ring_pulse",
+      "name": "环形脉冲",
+      "category": "particle",
+      "description": "从中心向外扩散的频谱彩色光环",
+      "class_name": "RingPulseEffect",
+      "params": { "ring_probability": 0.08, "max_radius": 500, "speed": 1.5 }
+    },
+    {
+      "id": "polar_grid",
+      "name": "极坐标网格",
+      "category": "grid",
+      "description": "极坐标系音频驱动网格变形",
+      "class_name": "PolarGridEffect",
+      "params": { "radius_range": [30, 400], "radius_step": 30, "num_points": 60 }
+    },
+    {
+      "id": "particle_burst",
+      "name": "粒子爆发",
+      "category": "particle",
+      "description": "音频触发粒子爆发 - 高能量触发大量粒子",
+      "class_name": "ParticleBurstEffect",
+      "params": { "burst_threshold": 0.5, "max_particles_per_burst": 20 }
+    },
+    {
+      "id": "audio_fingerprint",
+      "name": "音频指纹",
+      "category": "spectrum",
+      "description": "环形频谱指纹 - 辐射线 + 特征点标示",
+      "class_name": "AudioFingerprintEffect",
+      "params": { "num_bands": 64, "inner_radius": 50, "outer_radius_base": 100, "outer_radius_max": 150 }
+    },
+    {
+      "id": "spectrum_mountain",
+      "name": "频谱山峦",
+      "category": "wave",
+      "description": "频谱驱动的层叠山峦效果",
+      "class_name": "SpectrumMountainEffect",
+      "params": { "layers": 5, "num_peaks": 8 }
+    },
+    {
+      "id": "circular_spectrum",
+      "name": "环形频谱",
+      "category": "spectrum",
+      "description": "64段频谱围绕圆心排列成环",
+      "class_name": "CircularSpectrumEffect",
+      "params": { "num_bars": 64, "inner_radius": 100, "max_bar_length": 80 }
+    },
+    {
+      "id": "dna_helix",
+      "name": "DNA螺旋",
+      "category": "3d",
+      "description": "DNA双螺旋结构旋转 - 音频驱动扭曲",
+      "class_name": "DNAHelixEffect",
+      "params": { "num_segments": 50, "helix_turns": 6, "base_radius": 60, "height": 500 }
+    },
+    {
+      "id": "note_rain",
+      "name": "音符雨",
+      "category": "text",
+      "description": "音乐符号下落效果 - ♪♫♬♩随能量改变速度",
+      "class_name": "NoteRainEffect",
+      "params": { "num_notes": 30, "fall_speed_base": 1, "fall_speed_range": 2 }
+    },
+    {
+      "id": "sound_vortex",
+      "name": "声音漩涡",
+      "category": "pattern",
+      "description": "多臂螺旋漩涡 - 从中心向外旋转展开",
+      "class_name": "SoundVortexEffect",
+      "params": { "arms": 5, "segments": 80, "min_radius": 30, "max_radius": 300 }
+    },
+    {
+      "id": "neon_tunnel",
+      "name": "霓虹隧道",
+      "category": "3d",
+      "description": "霓虹灯隧道透视效果 - 多层同心环",
+      "class_name": "NeonTunnelEffect",
+      "params": { "rings": 15, "radius_step": 30, "num_vertices": 24, "base_radius": 30 }
+    },
+    {
+      "id": "ripple",
+      "name": "水波涟漪",
+      "category": "particle",
+      "description": "音频触发的3D水波纹效果",
+      "class_name": "RippleEffect",
+      "params": { "trigger_threshold": 0.4, "max_radius": 200, "speed": 1.5 }
+    },
+    {
+      "id": "mobius_strip",
+      "name": "3D旋转环",
+      "category": "3d",
+      "description": "Mobius带旋转展示 - 带深度排序",
+      "class_name": "MobiusStripEffect",
+      "params": { "num_points": 100 }
+    },
+    {
+      "id": "fractal_tree",
+      "name": "分形树",
+      "category": "math",
+      "description": "递归分形树 - 音频驱动分支角度",
+      "class_name": "FractalTreeEffect",
+      "params": { "max_depth": 8, "base_length": 150, "branch_ratio": 0.7 }
+    },
+    {
+      "id": "hypercube",
+      "name": "超立方体",
+      "category": "3d",
+      "description": "4D超立方体(tesseract)投影到2D - 16顶点旋转",
+      "class_name": "HyperCubeEffect",
+      "params": { "scale": 120, "rotation_speed": 0.5 }
+    },
+    {
+      "id": "gradient_wall",
+      "name": "频谱渐变墙",
+      "category": "grid",
+      "description": "全屏频谱色彩渐变墙 - 每个像素色相由频率决定",
+      "class_name": "GradientWallEffect",
+      "params": { "step": 8 }
+    },
+    {
+      "id": "aurora_effect",
+      "name": "极光效果",
+      "category": "wave",
+      "description": "极光飘动效果 - 音频驱动的彩色光幕",
+      "class_name": "AuroraEffect",
+      "params": { "waves": 3, "step": 4, "base_y_ratio": 0.3 }
+    },
+    {
+      "id": "star_twinkle",
+      "name": "星光闪烁",
+      "category": "particle",
+      "description": "闪烁星空 - 150颗星星随音频明灭",
+      "class_name": "StarTwinkleEffect",
+      "params": { "num_stars": 150, "twinkle_freq": 5 }
+    },
+    {
+      "id": "bouncing_balls",
+      "name": "音频弹跳球",
+      "category": "particle",
+      "description": "10个彩色球体随音频能量弹跳",
+      "class_name": "BouncingBallsEffect",
+      "params": { "num_balls": 10, "velocity_range": [-3, 3], "radius_range": [10, 30] }
+    },
+    {
+      "id": "particle_connect",
+      "name": "粒子连线",
+      "category": "particle",
+      "description": "80个粒子互相连线 + 音频能量影响运动",
+      "class_name": "ParticleConnectEffect",
+      "params": { "num_particles": 80, "connection_distance": 100 }
+    }
+  ]
+}

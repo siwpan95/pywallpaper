@@ -1,0 +1,15 @@
+{
+  "_comment": "=== 通用效果JSON模板 === 占位符 {{...}} 由模板生成器自动填充。",
+  "_usage": "方式1: new_effect.py --full → 自动生成JSON + Python类骨架。方式2: new_effect.py --variant → 仅生成此JSON（class指向已有类）。",
+  "_no_edit": "id / full_name / class 字段由生成器自动计算，请勿手动填写。",
+  "id": "{{effect_id}}",
+  "name": "{{name}}",
+  "full_name": "{{full_name}}",
+  "category": "{{category}}",
+  "background_theme": "{{background_theme}}",
+  "class": "{{class_name}}",
+  "params": {
+    "_comment": "在此定义效果的参数化配置",
+    "example_param": "示例值"
+  }
+}

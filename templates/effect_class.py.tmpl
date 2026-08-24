@@ -1,0 +1,42 @@
+"""
+=== 通用效果类模板 ===
+占位符 {{...}} 由模板生成器自动填充。
+添加流程:
+  1. 将此文件内容复制到 render_system.py 的「效果类定义区域」
+  2. 实现 draw() 方法
+  3. 运行 python effects/generate.py 生成对应 JSON
+  4. 运行 python tools/auto_registry.py 验证对齐
+"""
+
+
+@register_effect("{{effect_id}}", "{{name}}", "{{category}}", "{{background_theme}}")
+class {{class_name}}(VisualEffect):
+    """{{full_name}}"""
+
+    def __init__(self, drawer, width, height, audio, cx=None, cy=None, params=None):
+        super().__init__(drawer, width, height, audio, cx, cy, params=params)
+        # ===== TODO: 初始化你的粒子/对象 =====
+        pass
+
+    def draw(self):
+        # ===== TODO: 实现绘制逻辑 =====
+        # 可用方法:
+        #   self.draw_circle(x, y, radius, color, fill=True)
+        #   self.draw_rect(x1, y1, x2, y2, color, fill=True)
+        #   self.draw_line(x1, y1, x2, y2, color, width=1)
+        #   self.draw_polygon(points, color, fill=True)
+        #   self.rgb(hue, saturation, value)       # hsv→rgb, 返回 (r,g,b)
+        #   self.color(hue)                         # 快捷取色
+        #   self.energy_color(energy, hue_offset)   # 根据能量取色
+        #
+        # 音频数据:
+        #   self.audio.get_band_energy(band_index)  # 0~63 频带能量
+        #   self.audio.freq_amp                     # 原始FFT振幅
+        #
+        # 时间:
+        #   self.time                               # 累计运行秒数
+        #
+        # 画布:
+        #   self.width, self.height                 # 画布尺寸
+        #   self.center_x, self.center_y            # 中心坐标
+        pass

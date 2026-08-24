@@ -1,0 +1,15 @@
+{
+  "_comment": "=== 参数化变体JSON模板 === 复用已有效果类，通过 params 定制行为。",
+  "_usage": "new_effect.py --variant --class ExistingEffect --name '新变体名'",
+  "id": "{{effect_id}}",
+  "name": "{{name}}",
+  "full_name": "{{full_name}}",
+  "category": "{{category}}",
+  "background_theme": "{{background_theme}}",
+  "class": "{{class_name}}",
+  "params": {
+    "_comment": "参数化变体：修改此处参数以定制效果行为",
+    "speed": 1.5,
+    "color_offset": 0.3
+  }
+}

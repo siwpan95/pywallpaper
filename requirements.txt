@@ -1,0 +1,8 @@
+# pywallpaper dependencies (auto-generated 2026-08-20)
+asteval
+imageio
+numba
+numpy
+Pillow
+pygame-ce
+pystray

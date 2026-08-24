@@ -1,0 +1,37 @@
+{
+  "description": "壁纸渲染器全局配置",
+  "version": "1.0.0",
+  "wallpaper": {
+    "target_fps": 30,
+    "resolution_scale": 1.0,
+    "default_width": 1920,
+    "default_height": 1080,
+    "temp_filename": "wallpaper_temp.png",
+    "background_themes": ["星空", "渐变", "极光", "无"],
+    "default_bg_theme": "星空",
+    "background_default_color": [192, 192, 192]
+  },
+  "effect_switch": {
+    "enabled": true,
+    "interval_min": 5,
+    "interval_max": 30,
+    "transition_duration": 1.5
+  },
+  "performance": {
+    "low_perf_fps_threshold_ratio": 0.6,
+    "recovery_fps_threshold_ratio": 0.9,
+    "resolution_scale_down_factor": 0.75,
+    "resolution_scale_up_factor": 1.25,
+    "min_resolution_scale": 0.5
+  },
+  "audio": {
+    "num_bands": 64,
+    "sample_rate": 44100,
+    "smoothing_factor": 0.9,
+    "freq_data_length": 1024
+  },
+  "debug": {
+    "verbose": false,
+    "show_fps": true
+  }
+}
