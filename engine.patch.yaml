@@ -9,3 +9,4 @@ inline_records:
     date: '2026-08-25'
     note: J2 S2 能力层并入 alloy.media 后，pywallpaper/engine 为内联副本。含 formula_engine/primitives/recipes/color_system/audio_map/utils/helpers/core/effect_loader。导入前缀 engine.*（合金侧 alloy.media.*）；应用级 utils/helpers.py 亦内联至合金 media/helpers.py。
     import_prefix: engine
+    divergence: 2026-08-25 方案 A：alloy 侧 CAPrimitive 已退役 numba JIT 快路径（配方公式为唯一真相，ca_kernel 转史料）；本内联副本仍含 JIT 路径（行为一致未受 bug 影响的配方仍同画面，BZ/扩散配方从此以 alloy 公式路径为准）。下次 sync 时随 --take-base media 跟进。
