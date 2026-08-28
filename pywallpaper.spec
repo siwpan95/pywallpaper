@@ -1,15 +1,15 @@
 # -*- mode: python ; coding: utf-8 -*-
-# pywallpaper 安装包样板 spec（2026-08-25）
+# pywallpaper 安装包样板 spec（2026-08-25，2026-08-27 目录重构更新路径）
 a = Analysis(
-    ['G:/media/pywallpaper/main.pyw'],
-    pathex=['G:/media/pywallpaper'],
+    ['G:/repos/pywallpaper/main.pyw'],
+    pathex=['G:/repos/pywallpaper'],
     binaries=[],
     datas=[
-        ('G:/media/pywallpaper/recipes', 'recipes'),
-        ('G:/media/pywallpaper/effects', 'effects'),
-        ('G:/media/pywallpaper/data', 'data'),
-        ('G:/media/pywallpaper/templates', 'templates'),
-        ('G:/media/pywallpaper/assets', 'assets'),
+        ('G:/repos/pywallpaper/recipes', 'recipes'),
+        ('G:/repos/pywallpaper/effects', 'effects'),
+        ('G:/repos/pywallpaper/data', 'data'),
+        ('G:/repos/pywallpaper/templates', 'templates'),
+        ('G:/repos/pywallpaper/assets', 'assets'),
     ],
     hiddenimports=[],
     hookspath=[],

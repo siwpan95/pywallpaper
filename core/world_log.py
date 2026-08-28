@@ -46,6 +46,13 @@ class WorldLog:
         self._seq = 0
         self._projections: Dict[str, dict] = {}
 
+    # ── 运行 id ────────────────────────────────────────
+
+    @classmethod
+    def new_run_id(cls) -> str:
+        """生成新的运行 id（每次进程启动唯一，供任务日志按次审计）。"""
+        return f"run-{time.time_ns()}"
+
     # ── 追加 ──────────────────────────────────────────
 
     @property
