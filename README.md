@@ -1,5 +1,7 @@
 # PyWallpaper — 数学公式驱动的动态壁纸引擎
 
+> 仓库：<https://gitee.com/siwpan/pywallpaper> ｜ 许可：MIT（见 [LICENSE](LICENSE)）
+
 ECS 架构的音乐可视化动态壁纸系统，集成了 draw 项目的数学公式引擎和细胞自动机（CA）能力，支持粒子系统、流体模拟等多种效果类型。Python 负责逻辑，JSON 负责内容，通过装饰器 + 子类自动发现实现零硬编码注册。
 
 > 自包含说明：draw 的配方库已收归本项目的 `recipes/` 目录（2026-08-21），CA 原语不再依赖外部 draw 目录，可独立运行。draw 项目保留其自身副本，可随时归档。
