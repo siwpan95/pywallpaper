@@ -1,6 +1,6 @@
 ---
 name: pywallpaper
-description: Maintain pywallpaper the media engine (G:/media/pywallpaper). ECS audio-visual wallpaper with formula engine, CA recipes and three-things CLI.
+description: Maintain pywallpaper the media engine (本 SKILL.md 所在仓库根). ECS audio-visual wallpaper with formula engine, CA recipes and three-things CLI.
 agent_created: true
 ---
 
