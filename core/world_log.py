@@ -2,7 +2,7 @@
 追加式世界事件日志（WorldLog）—— 日志即事实源
 ================================================
 
-[内联自 alloy 引擎 G:\\games\\alloy\\core\\world_log.py，2026-08-24，复制优于共享]
+[内联自 alloy 引擎的 core/world_log.py（原仓路径已失效），2026-08-24，复制优于共享]
 [media_engine 阶段 A：pywallpaper 三件事升级之二（日志即事实源）]
 
 对应 harness 的事件源纪律（"Model-visible means logged"）的引擎版：

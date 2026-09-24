@@ -2,7 +2,7 @@
 可逆装配内核 — Context（注册即回滚）
 ====================================
 
-[内联自 alloy 引擎 G:\\games\\alloy\\core\\context.py，2026-08-24，复制优于共享]
+[内联自 alloy 引擎的 core/context.py（原仓路径已失效），2026-08-24，复制优于共享]
 [media_engine 阶段 A：pywallpaper 三件事升级之一（注册即回滚）]
 
 源自 Cordis 的三个核心算子，为 alloy 提供声明式装配：

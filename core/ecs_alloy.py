@@ -2,7 +2,7 @@
 ECS 架构核心 — 类型安全版本
 ==============================
 
-[内联自 alloy 引擎 G:\\games\\alloy\\core\\ecs.py，2026-08-25，J2 S1 唯一 ECS]
+[内联自 alloy 引擎的 core/ecs.py（原仓路径已失效），2026-08-25，J2 S1 唯一 ECS]
 [复制优于共享：本副本是引擎 ECS 在媒体引擎内的内联，升级走 engine.patch.yaml + sync]
 
 融合 carimara_py 的 ECS 核心设计与扩展功能：
