@@ -1,5 +1,12 @@
 # PyWallpaper — 数学公式驱动的动态壁纸引擎
 
+## 仓库角色定位（投资组合分级 ②）
+
+> 本仓在 siwpan 投资组合（D:/projects/repos，共 133 仓）中定级为 **② 保留**，领域 **视频/图像/特效**。
+> **角色**：创意库。
+> **维护策略**：② 旗舰 / 枢纽仓库打磨保留，作为能力展示或收敛点；② 保留类仓库低优先维持、不主动扩张。
+> 投资组合统一分级索引：`D:/projects/repos/PORTFOLIO_TIERING.md`。
+
 > 仓库：<https://gitee.com/siwpan/pywallpaper> ｜ 许可：MIT（见 [LICENSE](LICENSE)）
 
 ECS 架构的音乐可视化动态壁纸系统，集成了 draw 项目的数学公式引擎和细胞自动机（CA）能力，支持粒子系统、流体模拟等多种效果类型。Python 负责逻辑，JSON 负责内容，通过装饰器 + 子类自动发现实现零硬编码注册。
