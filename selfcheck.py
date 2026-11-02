@@ -198,6 +198,49 @@ def run_checks():
         raise AssertionError("粒子数超过 max_particles 上限")
     checks.append(f"粒子原语：3 帧发射 {alive} 个粒子并绘出 {lit} 个非零色彩通道，过期后归零，上限 40 生效")
 
+    # --- 4. 可逆装配内核（Context）-------------------------------------------
+    from core.context import Context, MissingDependencyError
+
+    ctx = Context()
+    rollback = []
+    ctx.provide("svc", 1, dispose=lambda: rollback.append("svc-undone"))
+    ctx.effect(lambda: rollback.append("effect-undone"))
+    if ctx.get("svc") != 1:
+        raise AssertionError("Context.get 取不到服务")
+
+    # 事件总线
+    events = []
+    ctx.on("tick", lambda v: events.append(v))
+    ctx.emit("tick", 42)
+    if events != [42]:
+        raise AssertionError(f"事件派发错误: {events}")
+
+    # 插件：inject 校验 + 独立卸载
+    class NeedsSvc:
+        name = "needs"
+        inject = ["absent"]
+
+        def apply(self, c, cfg):
+            pass
+
+    try:
+        ctx.install(NeedsSvc(), {})
+        raise AssertionError("inject 缺失应当报错")
+    except MissingDependencyError:
+        pass
+
+    handle = ctx.install(lambda c, cfg: c.provide("plug", 1), {})
+    if "plug" not in ctx.keys():
+        raise AssertionError("插件未注册服务")
+    handle.dispose()
+    if "plug" in ctx.keys():
+        raise AssertionError("插件卸载后服务仍在")
+
+    ctx.dispose()
+    if rollback != ["effect-undone", "svc-undone"]:
+        raise AssertionError(f"逆序回滚顺序错误: {rollback}")
+    checks.append(f"可逆装配内核：服务+事件+插件生命周期+逆序回滚（{len(rollback)} 项回滚）")
+
     return checks
 
 

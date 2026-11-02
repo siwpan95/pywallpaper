@@ -133,11 +133,19 @@ class WorldLog:
         """把总线事件自动追加进日志（世界事实类事件）。
 
         返回 disposer：调用即取消桥接（可交给 Context.effect 随作用域回滚）。
+
+        处理器接受任意参数个数：单参事件取该值，多参事件取元组，
+        以便 "effect:switching"(prev, next) 这类多载荷事件也能入账。
         """
 
-        def _handler(event_type: str) -> Callable[[Any], None]:
-            def handler(data: Any) -> None:
-                self.append(event_type, data)
+        def _handler(event_type: str) -> Callable[..., None]:
+            def handler(*args: Any) -> None:
+                if not args:
+                    self.append(event_type, None)
+                elif len(args) == 1:
+                    self.append(event_type, args[0])
+                else:
+                    self.append(event_type, list(args))
             return handler
 
         handlers = [(et, _handler(et)) for et in event_types]

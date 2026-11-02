@@ -71,10 +71,13 @@ class PerformanceMonitor:
 class WallpaperRenderer:
     """壁纸渲染器 - 主控制器，组装各系统"""
 
-    def __init__(self, width: int = 1920, height: int = 1080):
+    def __init__(self, width: int = 1920, height: int = 1080, ctx=None):
         self.config = get_config()
         self.width = width
         self.height = height
+        # 装配上下文：提供时，渲染过程会发布事件（效果切换/分辨率变化/暂停等）
+        self.ctx = ctx
+        self._muted = False
 
         # 音频系统
         print("[INIT] 创建 AudioSimulator...", flush=True)
@@ -101,6 +104,7 @@ class WallpaperRenderer:
             os.environ.get('TEMP', '.'), self.config['wallpaper']['temp_filename'])
         self.running = True
         self.paused = False  # 托盘可暂停渲染
+        self._shutdown_done = False  # shutdown 幂等标记
 
         # 帧率控制
         self.last_frame_time = time.time()
@@ -123,7 +127,7 @@ class WallpaperRenderer:
 
         # 系统托盘
         from systems.tray_system import SystemTrayManager
-        self.tray = SystemTrayManager(self)
+        self.tray = SystemTrayManager(self, ctx=ctx)
 
         # 注册退出清理钩子
         atexit.register(self.shutdown)
@@ -132,6 +136,46 @@ class WallpaperRenderer:
         """生成并播放音乐"""
         self.music = MusicPlaybackSystem(self.audio)
         self.music.generate_and_play()
+
+    # ---- 状态控制（供事件驱动调用） ----
+
+    @property
+    def muted(self) -> bool:
+        """是否静音"""
+        return getattr(self, "_muted", False)
+
+    def set_muted(self, muted: bool) -> bool:
+        """设置静音状态。返回是否实际发生变化。
+
+        跨线程安全：托盘线程通过事件调用本方法。
+        """
+        muted = bool(muted)
+        if muted == self.muted:
+            return False
+        self._muted = muted
+        try:
+            import pygame
+            if not pygame.mixer.get_init():
+                return True
+            if muted:
+                if pygame.mixer.music.get_busy():
+                    pygame.mixer.music.pause()
+            else:
+                if pygame.mixer.music.get_busy():
+                    pygame.mixer.music.unpause()
+                elif self.music and self.music.music_path:
+                    pygame.mixer.music.play(loops=-1)
+        except Exception as e:
+            print(f"[RENDER] 切换静音失败: {e}")
+        return True
+
+    def set_paused(self, paused: bool) -> bool:
+        """设置暂停状态。返回是否实际发生变化。"""
+        paused = bool(paused)
+        if paused == self.paused:
+            return False
+        self.paused = paused
+        return True
 
     def get_screen_resolution(self) -> tuple:
         """获取屏幕分辨率"""
@@ -146,6 +190,18 @@ class WallpaperRenderer:
         current_time = time.time()
         dt = current_time - self.last_frame_time
         self.last_frame_time = current_time
+
+        # 效果热插拔/HMR：在主线程落地监听线程发现的文件变更
+        # （懒缓存引用，避免每帧加锁查询 Context）
+        hr = getattr(self, "_hot_reloader", None)
+        if hr is None and self.ctx is not None and "hot_reloader" in self.ctx:
+            hr = self.ctx.get("hot_reloader")
+            self._hot_reloader = hr
+        if hr is not None:
+            try:
+                hr.consume_pending()
+            except Exception:
+                pass
 
         # 更新音频
         self.audio.update(dt)
@@ -237,6 +293,10 @@ class WallpaperRenderer:
                 frame_count += 1
                 frame_count_per_sec += 1
 
+                # 帧完成事件（供装配层订阅者感知渲染进度）
+                if self.ctx is not None:
+                    self.ctx.emit("render:frame", frame_count)
+
                 frame_time = time.time() - frame_start
                 frame_times_sum += frame_time
 
@@ -253,6 +313,8 @@ class WallpaperRenderer:
                             self.render_height = int(self.height * self.resolution_scale)
                             self.bg_theme = None
                             print(f"[性能] 降低分辨率至 {self.render_width}x{self.render_height}")
+                            if self.ctx is not None:
+                                self.ctx.emit("render:resized", self.render_width, self.render_height)
                     elif actual_fps > self.target_fps * perf_cfg['recovery_fps_threshold_ratio'] and self.low_performance_mode:
                         if self.resolution_scale < 1.0:
                             self.resolution_scale = min(
@@ -261,6 +323,8 @@ class WallpaperRenderer:
                             self.render_height = int(self.height * self.resolution_scale)
                             self.bg_theme = None
                             print(f"[性能] 提高分辨率至 {self.render_width}x{self.render_height}")
+                            if self.ctx is not None:
+                                self.ctx.emit("render:resized", self.render_width, self.render_height)
 
                     print(f"[{self.effect_manager.current_name}] FPS: {actual_fps:.1f} | 渲染: {self.render_width}x{self.render_height}")
 
@@ -278,7 +342,13 @@ class WallpaperRenderer:
             self.shutdown()
 
     def shutdown(self):
-        """完整关闭渲染器：停止托盘、停止音乐、释放资源"""
+        """完整关闭渲染器：停止托盘、停止音乐、释放资源。
+
+        幂等：atexit 钩子与 Context.dispose() 可能先后调用，只执行一次。
+        """
+        if getattr(self, "_shutdown_done", False):
+            return
+        self._shutdown_done = True
         print("[EXIT] 正在关闭...", flush=True)
         self.running = False
         self.paused = False  # 解除暂停，让主循环退出

@@ -17,18 +17,110 @@ ECS 架构的音乐可视化动态壁纸系统，集成了 draw 项目的数学�
 
 ## 零、三件事 CLI（media_engine 阶段 A，2026-08-24 纯加法）
 
-- 装配自省：`python main.pyw --dump-profile`（effects/primitives/可选依赖清单，agent 审计入口）
+- 装配自省：`python main.pyw --dump-profile`（effects/primitives/可选依赖清单 + **真实 Context 注册表快照**，agent 审计入口）
 - 任务日志审计：`python main.pyw --dump-log [日志路径]`（默认 data/logs/wallpaper.log，JSONL 与 WorldLog 同构）
 - 运行日志：启动即写 run_start/run_end 到 data/logs/wallpaper.log；内核 `core/context.py`（注册即回滚）与 `core/world_log.py` 内联自 alloy 引擎（复制优于共享）
-- 冒烟：`python test_three_things.py`（3/3）
+- 冒烟：`python test_three_things.py`（9/9，含接线改造后的新用例）
+
+## 零·二、Context 装配（2026-11-02 接线改造）
+
+主路径不再裸装各子系统，而是经 `core/assembly.py` 以**插件**形式装配到 `core/context.py` 的可逆装配内核。
+
+### 装配链路
+
+```
+main.pyw
+  └→ core/assembly.build_context()
+       ├→ install_logging        → 服务 "log"(WorldLog) / "run_id"
+       ├→ install_config         → 服务 "config"
+       ├→ install_audio          → 服务 "audio" / "music"        （依赖 config）
+       ├→ install_effect_manager → 服务 "effect_manager"          （依赖 config）
+       ├→ install_renderer       → 服务 "renderer"               （依赖 config/audio/effect_manager）
+       ├→ install_tray           → 服务 "tray"                    （依赖 renderer）
+       └→ install_world_log_bridge→ 事件 → 日志 自动入账
+  └→ renderer.run()  →  finally: ctx.dispose()   ← 逆序完整回滚
+```
+
+每个子系统都是「有名字、有依赖声明、有 disposer」的插件：`inject` 声明的依赖在装配期校验（缺失即报错），
+退出时按注册逆序回滚（托盘 → 渲染器 → 效果管理 → 音频 → 配置 → 日志落盘）。
+
+### Context 提供的算子
+
+| 算子 | 说明 |
+|---|---|
+| `provide(key, service, dispose=)` | 注册服务，disposer 压入回滚栈 |
+| `get(key, default=...)` | 依赖查找，缺失即报错（支持父链查找） |
+| `effect(fn)` | 注册可逆副作用，随作用域销毁自动撤销 |
+| `install(plugin, config)` | 按 `name`/`inject`/`apply` 协议装配插件，返回 `PluginHandle` |
+| `on/once/off/emit` | 事件总线；订阅本身是可逆副作用，随插件卸载自动退订 |
+| `snapshot()` | 装配自省：服务、条目数、事件订阅数 |
+
+插件三种形态（与 Cordis 对齐）：函数 `def p(ctx, config)`、对象（带 `apply(ctx, config)`）、类（`__init__(ctx, config)`）。
+
+### 事件约定
+
+| 事件 | 触发时机 | 载荷 |
+|---|---|---|
+| `effect:switching` | 效果开始过渡 | `(prev_name, next_name)` |
+| `effect:switched` | 效果切换完成 | `(name)` |
+| `effect:requested` | 请求切换到下一个效果 | — |
+| `render:frame` | 每帧渲染完成 | `(frame_index)` |
+| `render:resized` | 性能自适应导致分辨率变化 | `(width, height)` |
+| `audio:muted` | 静音状态变化 | `(muted)` |
+| `render:paused` | 暂停状态变化 | `(paused)` |
+| `app:quit` | 请求退出程序 | — |
+| `effect:reloaded` | 单个效果 JSON 热更新生效 | `(full_name, kind)` |
+| `effect:hotplug_added` | 运行时新增效果文件 | `(full_name)` |
+| `effect:hotplug_removed` | 运行时删除效果文件 | `(full_name)` |
+| `effect:themes_reloaded` | 背景主题表热更新 | `(names)` |
+| `effect:reload_requested` | 请求手动全量重载（托盘菜单触发） | — |
+
+托盘菜单回调不再直改渲染器状态，而是 emit 事件由订阅者执行 —— 托盘线程与渲染主线程通过 Context 通信
+（Context 用 RLock 保护，跨线程 emit 安全）。
+
+### 效果热插拔 / HMR（2026-11-02 演进）
+
+效果本质是 `effects/*.json` 数据（`load_effects()` 把它们装进全局 `EFFECT_REGISTRY`，
+`EffectManager` 每帧现实例化当前效果），因此**改一个 JSON 即热替换、无需重启**。
+
+新增 `core/hot_reload.py` 的 `HotReloader`：
+
+- **监听线程（daemon）** 只扫描 `effects/` 目录 + `effects/themes.json`、计算 md5，把
+  新增 / 修改 / 删除变更入队 `queue.Queue`；**绝不修改注册表**。
+- **主渲染线程** 每帧在 `render_frame()` 调用 `consume_pending()`，在**主线程**落地变更。
+  于是注册表 dict 永远只在主线程被改，与渲染读取天然无竞争 —— **零锁**。
+- 支持：运行时新增/删除/修改效果（自动刷新可切换名列表）、`themes.json` 热更新、
+  托盘菜单「🔄 重新加载效果」触发全量重扫。
+
+用法：
+
+```bash
+python main.pyw                      # GUI 模式默认开启热插拔（监听 effects/）
+python main.pyw --no-hot-reload     # 关闭监听（适合打包/性能敏感场景）
+```
+
+设计取舍：Python 原语类（`engine/primitives/*.py`）的热重载需 `importlib.reload` 且无法可靠
+重绑已被其他模块持有的引用，故**本期不做**；效果数据层的 JSON HMR 已覆盖绝大多数日常迭代。
+
+### 为什么不用官方 Cordis
+
+Cordis 官方版是 TypeScript（[cordiverse/cordis](https://github.com/cordiverse/cordis)，9.5k star，官方声明 API 未稳定），
+PyPI 上的 Python 移植版有 8 个以上同名包、无官方版本、生态混乱。
+本项目已有等价的 Cordis 语义内核（`core/context.py` 文件头即注明「源自 Cordis 的三个核心算子」），
+因此选择在既有内核上就地演进，避免两套并存的服务容器与依赖锁定。
 
 ## 一、项目结构
 
 ```
 pywallpaper/
-├── main.py                          # 入口，命令行参数 → 创建 WallpaperRenderer → 启动循环
+├── main.py                          # 入口，命令行参数 → Context 装配 → 启动渲染循环
 ├── ecs.py                           # ECS 框架基类（Entity / Component / System / World）
 ├── data_loader.py                   # 统一 JSON 加载器（config.json / audio.json）
+│
+├── core/                            # 可逆装配内核（2026-11-02 接线改造新增）
+│   ├── context.py                   # Context：服务注册表 + 事件总线 + 可逆副作用栈
+│   ├── assembly.py                  # 装配层：各子系统作为插件装入 Context
+│   └── world_log.py                 # WorldLog：日志即事实源（可桥接事件总线）
 │
 ├── engine/                          # 新增：数学公式引擎和原语系统
 │   ├── formula_engine.py            # 统一公式引擎（结合 draw 的 asteval 系统）
@@ -180,8 +272,12 @@ GUI 工具，功能包括：
 
 ```
 ┌──────────────────────────────────────────┐
-│              入口层 (main.py)              │
-│    命令行解析 → 窗口/全屏模式 → 启动       │
+│              入口层 (main.pyw)             │
+│    命令行解析 → Context 装配 → 启动        │
+├──────────────────────────────────────────┤
+│           装配层 (core/assembly.py)       │
+│  各子系统作为插件装入 Context              │
+│  inject 依赖校验 + 逆序回滚 + 事件总线     │
 ├──────────────────────────────────────────┤
 │          原语层 (engine/primitives/)      │
 │  FormulaEngine 公式求值                  │

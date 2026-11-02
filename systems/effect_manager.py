@@ -1,6 +1,10 @@
 """
 效果管理器 - 效果切换、过渡、背景主题管理
 EFFECT_REGISTRY 的值为 (EffectClass, params_dict) 元组或 (engine_config,) 单元素组。
+
+[2026-11-02 接线改造：事件化]
+切换过程通过 ctx.emit 发布 "effect:switching" / "effect:switched" 事件，
+使 WorldLog 桥接、托盘菜单与外部订阅者都能感知切换 —— 无需直连。
 """
 import random
 import time
@@ -41,10 +45,12 @@ def _make_effect(entry, draw, width, height, audio):
 class EffectManager:
     """管理效果切换和过渡"""
 
-    def __init__(self, effect_registry: dict, config: dict):
+    def __init__(self, effect_registry: dict, config: dict, ctx=None):
         self.effect_registry = effect_registry
         self.effect_names = list(effect_registry.keys())
         self.config = config
+        # 装配上下文：提供时切换过程发布事件
+        self.ctx = ctx
 
         # 当前状态
         self.current_idx = 0
@@ -72,6 +78,10 @@ class EffectManager:
         self.prev_effect_name: Optional[str] = None
         self.next_effect_name: Optional[str] = None
 
+    def refresh_names(self) -> None:
+        """热插拔后刷新可切换效果名列表（增删效果时调用）。"""
+        self.effect_names = list(self.effect_registry.keys())
+
     def update(self):
         """检查是否需要切换效果"""
         now = time.time()
@@ -95,12 +105,23 @@ class EffectManager:
         self.last_switch_time = time.time()
         self.switch_interval = random.uniform(self.switch_interval_min, self.switch_interval_max)
         print(f"过渡效果: {self.prev_effect_name} -> {self.next_effect_name}")
+        self._emit("effect:switching", self.prev_effect_name, self.next_effect_name)
 
     def _finish_transition(self):
         self.is_transitioning = False
         self.current_name = self.next_effect_name
         assert self.current_name is not None
         self.prev_effect_name = None
+        self._emit("effect:switched", self.current_name)
+
+    def _emit(self, event: str, *args) -> None:
+        """发布事件到装配上下文（无 ctx 时静默跳过）。"""
+        if self.ctx is None:
+            return
+        try:
+            self.ctx.emit(event, *args)
+        except Exception as e:
+            print(f"[EFFECT] 派发事件 '{event}' 失败: {e}")
 
     def get_current_effect_name(self) -> str:
         return self.next_effect_name if self.is_transitioning else self.current_name

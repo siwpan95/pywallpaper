@@ -1,6 +1,10 @@
 """
 系统托盘模块 - 最小化到系统托盘，右键菜单控制
 依赖: pystray, Pillow
+
+[2026-11-02 接线改造：事件驱动]
+菜单回调不再直接改渲染器状态，而是 emit 事件，由 core/assembly.py 装配的
+订阅者执行 —— 托盘线程与渲染主线程通过 Context 通信，避免跨线程直改状态。
 """
 import threading
 from typing import Callable, Optional
@@ -49,18 +53,21 @@ def _create_icon_image(size: int = 64, hue: float = 0.6) -> Image.Image:
 class SystemTrayManager:
     """系统托盘管理器 — 右键菜单控制壁纸"""
 
-    def __init__(self, renderer):
+    def __init__(self, renderer, ctx=None):
         """
         Args:
             renderer: WallpaperRenderer 实例，用于控制渲染/音乐/效果切换
+            ctx: core.context.Context 实例。提供时菜单回调改为 emit 事件
+                  （事件驱动、跨线程安全）；缺省时退化为直调 renderer（向后兼容）。
         """
+        self.renderer = renderer
+        self.ctx = ctx
         if not _PYSTRAY_OK:
             print("[TRAY] pystray 未安装，系统托盘功能不可用")
             print("[TRAY] 安装: pip install pystray")
             self._icon = None
             return
 
-        self.renderer = renderer
         self._icon: Optional[pystray.Icon] = None
         self._muted = False
         self._paused = False
@@ -80,9 +87,23 @@ class SystemTrayManager:
                 lambda text: '▶ 恢复渲染' if self._paused else '⏸ 暂停渲染',
                 self._toggle_pause),
             pystray.MenuItem('⏭ 下一个效果', self._next_effect),
+            pystray.MenuItem('🔄 重新加载效果', self._reload_effects),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem('❌ 退出', self._quit),
         )
+
+    # ---- 事件派发 ----
+
+    def _emit(self, event: str, *args) -> bool:
+        """emit 事件到 Context。返回是否成功派发（无 ctx 或无订阅者时为 False）。"""
+        if self.ctx is None:
+            return False
+        try:
+            self.ctx.emit(event, *args)
+            return True
+        except Exception as e:
+            print(f"[TRAY] 派发事件 '{event}' 失败: {e}")
+            return False
 
     # ---- 菜单回调 ----
 
@@ -95,7 +116,16 @@ class SystemTrayManager:
             return '♪ Blur 壁纸'
 
     def _toggle_mute(self, icon, item):
-        """切换静音"""
+        """切换静音（事件驱动：emit tray:mute，由装配层订阅者执行）"""
+        if self._emit("tray:mute"):
+            self._muted = not self._muted
+            print(f"[TRAY] {'已静音' if self._muted else '已取消静音'}")
+        else:
+            self._toggle_mute_direct()
+        self._update_icon(icon)
+
+    def _toggle_mute_direct(self):
+        """无 Context 时的直调退化路径（向后兼容）。"""
         self._muted = not self._muted
         try:
             if self._muted:
@@ -115,28 +145,56 @@ class SystemTrayManager:
                 print("[TRAY] 已取消静音")
         except Exception as e:
             print(f"[TRAY] 切换静音失败: {e}")
-        icon.update_menu()
 
     def _toggle_pause(self, icon, item):
-        """切换暂停渲染"""
+        """切换暂停渲染（事件驱动：emit tray:pause）"""
+        if self._emit("tray:pause"):
+            self._paused = not self._paused
+            print(f"[TRAY] {'暂停渲染' if self._paused else '恢复渲染'}")
+        else:
+            self._toggle_pause_direct()
+        self._update_icon(icon)
+
+    def _toggle_pause_direct(self):
+        """无 Context 时的直调退化路径（向后兼容）。"""
         self._paused = not self._paused
         self.renderer.paused = self._paused
         print(f"[TRAY] {'暂停渲染' if self._paused else '恢复渲染'}")
-        icon.update_menu()
 
     def _next_effect(self, icon, item):
-        """切换到下一个效果"""
-        try:
-            self.renderer.effect_manager._start_transition()
-            print(f"[TRAY] 切换效果: {self.renderer.effect_manager.next_effect_name}")
-        except Exception as e:
-            print(f"[TRAY] 切换效果失败: {e}")
+        """切换到下一个效果（事件驱动：emit tray:next → effect:requested）"""
+        if not self._emit("tray:next"):
+            try:
+                self.renderer.effect_manager._start_transition()
+                print(f"[TRAY] 切换效果: {self.renderer.effect_manager.next_effect_name}")
+            except Exception as e:
+                print(f"[TRAY] 切换效果失败: {e}")
+
+    def _reload_effects(self, icon, item):
+        """手动全量重载效果（事件驱动：emit effect:reload_requested，由 HMR 插件消费）"""
+        from core.assembly import EVENTS
+        if not self._emit(EVENTS.EFFECT_RELOAD_REQUESTED):
+            print("[TRAY] 无可用 Context，无法请求效果重载")
+        else:
+            print("[TRAY] 已请求重新加载效果")
+        self._update_icon(icon)
 
     def _quit(self, icon, item):
-        """退出程序"""
+        """退出程序（事件驱动：emit app:quit）"""
         print("[TRAY] 用户点击退出")
-        icon.stop()
-        self.renderer.running = False
+        if not self._emit("tray:quit"):
+            if self._icon:
+                self._icon.stop()
+            self.renderer.running = False
+
+    def _update_icon(self, icon):
+        """刷新菜单显示（图标不可用时静默跳过）。"""
+        if icon is None:
+            return
+        try:
+            icon.update_menu()
+        except Exception:
+            pass
 
     # ---- 生命周期 ----
 

@@ -3,6 +3,10 @@ Blur — Windows 动态音频可视化壁纸
 ECS 架构: py负责逻辑 + json负责内容
 入口: python main.py [--auto-start|--remove-auto-start|--status|--silent]
 启动后自动最小化到系统托盘，右键托盘图标可控制（静音/暂停/退出等）
+
+[2026-11-02 接线改造：走 Context 装配]
+主路径不再裸装各子系统，而是经 core/assembly.py 以插件形式装配到 Context：
+每个子系统都有名字、依赖声明与 disposer，退出时按逆序完整回滚。
 """
 import sys
 import os
@@ -39,20 +43,15 @@ def main():
         _dump_log(path)
         return
 
-    # ── 运行级任务日志（日志即事实源，<项目>/data/logs/wallpaper.log） ──
-    from core.context import Context
-    from core.world_log import WorldLog
-    ctx = Context()
-    log = WorldLog()
-    ctx.provide("log", log)
-    _run_id = WorldLog.new_run_id()
-    log.append("run_start", {"run_id": _run_id, "mode": ("silent" if '--silent' in args else "normal")})
-
     silent = '--silent' in args
+    # 效果热插拔/HMR：GUI 模式默认开启，可用 --no-hot-reload 关闭
+    with_hot_reload = '--no-hot-reload' not in args
 
-    # 创建渲染器（自动检测屏幕分辨率）
-    from systems.wallpaper_system import WallpaperRenderer
-    renderer = WallpaperRenderer()
+    # ── 装配（Context 可逆装配内核） ──
+    from core.assembly import build_context
+
+    ctx = build_context(silent=silent, with_hot_reload=with_hot_reload)
+    renderer = ctx.get("renderer")
 
     # 检测屏幕分辨率
     width, height = renderer.get_screen_resolution()
@@ -67,18 +66,15 @@ def main():
         print("  --remove-auto-start  关闭开机自启动")
         print("  --status             查看当前状态")
         print("  --silent             静默模式启动")
+        print("  --no-hot-reload     关闭效果热插拔/HMR（默认开启，监听 effects/ 变化）")
         print()
 
     # 运行
     try:
         renderer.run()
     finally:
-        log.append("run_end", {"run_id": _run_id, "ok": True})
-        try:
-            log.save_to(os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                     "data", "logs", "wallpaper.log"))
-        except OSError:
-            pass  # 日志落盘失败不阻断退出
+        # 逆序回滚：托盘 → 渲染器 → 效果管理 → 音频 → 配置 → 日志落盘
+        ctx.dispose()
 
 
 def _dump_profile() -> None:
@@ -107,7 +103,50 @@ def _dump_profile() -> None:
             print(f"    {k}={'OK' if v else '缺失'}")
     except Exception:
         pass
-    print("  services: log(WorldLog) + effects 注册表（EFFECT_REGISTRY）")
+
+    # ── 真实 Context 注册表快照（装配层实际状态，非硬编码描述） ──
+    _dump_context_snapshot()
+
+
+def _dump_context_snapshot() -> None:
+    """装配 Context 并输出真实快照：服务、插件、事件订阅。
+
+    与硬编码描述不同 —— 这里反映的是 core/assembly.py 实际装配出的运行时状态。
+    """
+    print("  --- Context 装配快照 ---")
+    try:
+        from core.assembly import build_context
+        ctx = build_context(silent=True, with_tray=False)
+    except Exception as exc:
+        print(f"  context: 装配失败 {type(exc).__name__}: {exc}")
+        return
+
+    try:
+        snap = ctx.snapshot()
+        print(f"  services ({len(snap['services'])}): {', '.join(snap['services'])}")
+        print(f"  entries: {snap['entries']}  children: {snap['children']}")
+        if snap['events']:
+            ev = ", ".join(f"{e}×{n}" for e, n in snap['events'].items())
+            print(f"  events ({snap['total_listeners']} 订阅): {ev}")
+        else:
+            print("  events: 无订阅")
+
+        # 各服务的真实类型
+        for key in ("config", "log", "audio", "music", "effect_manager", "renderer"):
+            try:
+                svc = ctx.get(key)
+                print(f"    {key}: {type(svc).__name__}")
+            except Exception:
+                pass
+
+        # 效果管理器实际装载的效果数
+        try:
+            em = ctx.get("effect_manager")
+            print(f"  effect_manager: {len(em.effect_names)} 个效果, 当前 {em.current_name}")
+        except Exception as exc:
+            print(f"  effect_manager: 读取失败 {exc}")
+    finally:
+        ctx.dispose()
 
 
 def _dump_log(path: str | None) -> None:
