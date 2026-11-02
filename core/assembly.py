@@ -27,6 +27,12 @@ main.pyw 不再裸装 AudioSimulator / EffectManager / WallpaperRenderer，
     render:paused      暂停状态变化   (paused: bool)
     app:quit           请求退出程序   (无参)
 
+    原语类热重载（engine/primitives/*.py）::
+        primitive:reloaded     原语模块已热重载（修改） (module, names)
+        primitive:added        新增原语模块          (module, names)
+        primitive:removed      删除原语模块          (module, names)
+        primitive:reload_failed 原语重载失败          (module, error)
+
 纯标准库 + 项目内模块，零新增第三方依赖。
 """
 
@@ -69,6 +75,11 @@ class EVENTS:
     EFFECT_HOTPLUG_REMOVED = "effect:hotplug_removed"
     EFFECT_THEMES_RELOADED = "effect:themes_reloaded"
     EFFECT_RELOAD_REQUESTED = "effect:reload_requested"
+    # Python 原语类热重载
+    PRIMITIVE_RELOADED = "primitive:reloaded"
+    PRIMITIVE_ADDED = "primitive:added"
+    PRIMITIVE_REMOVED = "primitive:removed"
+    PRIMITIVE_RELOAD_FAILED = "primitive:reload_failed"
 
 
 # ── 各子系统插件 ──────────────────────────────────────
@@ -247,6 +258,7 @@ def install_hot_reload(ctx: Context, *, watch: bool = True,
     """
     project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     effects_dir = os.path.join(project_root, "effects")
+    primitives_dir = os.path.join(project_root, "engine", "primitives")
 
     class HotReloadPlugin:
         name = "hot_reloader"
@@ -254,7 +266,11 @@ def install_hot_reload(ctx: Context, *, watch: bool = True,
 
         def apply(self, c, cfg):
             from core.hot_reload import HotReloader
-            reloader = HotReloader(c, effects_dir, interval=interval, enabled=watch)
+            reloader = HotReloader(
+                c, effects_dir,
+                primitives_dir=primitives_dir,
+                interval=interval, enabled=watch,
+            )
             reloader.start()
             c.provide("hot_reloader", reloader)
 
@@ -288,6 +304,9 @@ def install_world_log_bridge(ctx: Context, event_types: Optional[List[str]] = No
         EVENTS.EFFECT_HOTPLUG_ADDED,
         EVENTS.EFFECT_HOTPLUG_REMOVED,
         EVENTS.EFFECT_THEMES_RELOADED,
+        EVENTS.PRIMITIVE_RELOADED,
+        EVENTS.PRIMITIVE_ADDED,
+        EVENTS.PRIMITIVE_REMOVED,
         EVENTS.RENDER_RESIZED,
         EVENTS.AUDIO_MUTED,
         EVENTS.RENDER_PAUSED,

@@ -581,6 +581,165 @@ def test_hot_reload_plugin_wiring():
     print("[OK] 热重载插件：提供服务 + 订阅手动重载事件")
 
 
+# ── 原语类热重载用例（engine/primitives/*.py） ─────────────
+
+
+def test_primitive_reload_modified():
+    """修改既有原语模块后，PRIMITIVE_REGISTRY 类被替换为新对象，
+    create_primitive 下一帧即返回新类（无需重启）。"""
+    import importlib
+    import sys
+    from engine.primitives import PRIMITIVE_REGISTRY, create_primitive
+    from core.hot_reload import HotReloader
+
+    before = id(PRIMITIVE_REGISTRY["bars"])
+    reloader = HotReloader(ctx=None, effects_dir="effects",
+                           primitives_dir="engine/primitives", enabled=False)
+    try:
+        reloader._apply_primitive(
+            {"kind": "primitive_modified", "module": "engine.primitives.bars",
+             "path": "engine/primitives/bars.py"}, "primitive_modified")
+        after = id(PRIMITIVE_REGISTRY["bars"])
+        assert before != after, "reload 后类对象应被替换"
+        inst = create_primitive({"type": "bars"}, 100, 100)
+        assert type(inst).__name__ == "BarsPrimitive"
+        assert type(inst).__module__ == "engine.primitives.bars"
+    finally:
+        # 恢复：重新载入原文件，使运行时回到一致状态（类对象再次刷新但功能等价）
+        importlib.reload(sys.modules["engine.primitives.bars"])
+    print("[OK] 原语热重载：修改后类对象被替换且 create_primitive 生效")
+
+
+def test_primitive_reload_dependency_order():
+    """ca_kernel 变更应连带 reload 其依赖方 ca，且 ca_kernel 排在 ca 之前。"""
+    from core.hot_reload import HotReloader
+
+    r = HotReloader(ctx=None, effects_dir="effects",
+                    primitives_dir="engine/primitives", enabled=False)
+    affected = r._collect_reload_set("ca_kernel")
+    order = r._topo_order(affected)
+    assert "ca_kernel" in affected and "ca" in affected, affected
+    assert order.index("ca_kernel") < order.index("ca")
+    print("[OK] 原语热重载：ca_kernel 变更拓扑连带 ca 且顺序正确")
+
+
+def test_primitive_hotplug_added():
+    """新增原语模块经 HMR 落地注册表，create_primitive 可取实例。"""
+    import os
+    from engine.primitives import PRIMITIVE_REGISTRY, create_primitive
+    from core.hot_reload import HotReloader
+
+    tmp = "engine/primitives/_hmr_tmp_test.py"
+    with open(tmp, "w", encoding="utf-8") as f:
+        f.write(
+            "from engine.primitives import register_primitive, RenderPrimitive\n"
+            "@register_primitive('_hmr_tmp_test')\n"
+            "class Tmp(RenderPrimitive):\n"
+            "    def draw(self, d): pass\n"
+        )
+    reloader = HotReloader(ctx=None, effects_dir="effects",
+                           primitives_dir="engine/primitives", enabled=False)
+    try:
+        reloader._apply_primitive(
+            {"kind": "primitive_added", "module": "engine.primitives._hmr_tmp_test",
+             "path": tmp}, "primitive_added")
+        assert "_hmr_tmp_test" in PRIMITIVE_REGISTRY
+        assert create_primitive({"type": "_hmr_tmp_test"}, 10, 10).__class__.__name__ == "Tmp"
+    finally:
+        reloader._apply_primitive(
+            {"kind": "primitive_removed", "module": "engine.primitives._hmr_tmp_test",
+             "path": tmp}, "primitive_removed")
+        if os.path.exists(tmp):
+            os.remove(tmp)
+    assert "_hmr_tmp_test" not in PRIMITIVE_REGISTRY
+    print("[OK] 原语热插拔：新增模块落地注册表并实例化")
+
+
+def test_primitive_reload_failure_isolated():
+    """语法错误的原语模块重载失败应报错，且不污染注册表其他项。"""
+    import os
+    from engine.primitives import PRIMITIVE_REGISTRY
+    from core.hot_reload import HotReloader
+
+    tmp = "engine/primitives/_hmr_broken.py"
+    with open(tmp, "w", encoding="utf-8") as f:
+        f.write("this is ) not valid python @@@\n")
+    reloader = HotReloader(ctx=None, effects_dir="effects",
+                           primitives_dir="engine/primitives", enabled=False)
+    bars_before = id(PRIMITIVE_REGISTRY["bars"])
+    try:
+        reloader._apply_primitive(
+            {"kind": "primitive_added", "module": "engine.primitives._hmr_broken",
+             "path": tmp}, "primitive_added")
+        assert "_hmr_broken" not in PRIMITIVE_REGISTRY
+        assert id(PRIMITIVE_REGISTRY["bars"]) == bars_before
+    finally:
+        if os.path.exists(tmp):
+            os.remove(tmp)
+    print("[OK] 原语热重载：坏模块失败隔离，不污染注册表")
+
+
+def test_primitive_hot_reload_auto_threaded():
+    """监听线程自动发现新原语文件并入队，主线程 consume_pending 落地（跨线程）。"""
+    import os
+    import time
+    from engine.primitives import PRIMITIVE_REGISTRY
+    from core.hot_reload import HotReloader
+
+    tmp = "engine/primitives/_hmr_auto.py"
+    r = HotReloader(ctx=None, effects_dir="effects",
+                    primitives_dir="engine/primitives", enabled=True, interval=0.2)
+    r.start()  # 先建基线（此时临时文件尚不存在）
+    try:
+        # 基线之后再创建新原语文件 → 监听线程应检测为「新增」并入队
+        with open(tmp, "w", encoding="utf-8") as f:
+            f.write(
+                "from engine.primitives import register_primitive, RenderPrimitive\n"
+                "@register_primitive('_hmr_auto')\n"
+                "class A(RenderPrimitive):\n"
+                "    def draw(self, d): pass\n"
+            )
+        for _ in range(50):
+            if not r._queue.empty():
+                break
+            time.sleep(0.1)
+        applied = r.consume_pending()
+        assert applied >= 1, applied
+        assert "_hmr_auto" in PRIMITIVE_REGISTRY
+    finally:
+        r.stop()
+        if "_hmr_auto" in PRIMITIVE_REGISTRY:
+            r._apply_primitive(
+                {"kind": "primitive_removed", "module": "engine.primitives._hmr_auto",
+                 "path": tmp}, "primitive_removed")
+        if os.path.exists(tmp):
+            os.remove(tmp)
+    print("[OK] 原语热重载：监听线程自动发现新文件并落地（跨线程）")
+
+
+def test_hot_reload_plugin_wires_primitives():
+    """install_hot_reload 装配热重载器并暴露原语目录（engine/primitives）。"""
+    import os
+    from core.context import Context
+    from core.assembly import (install_config, install_effect_manager,
+                               install_hot_reload)
+
+    ctx = Context()
+    install_config(ctx)
+    install_effect_manager(ctx)
+    ctx.provide("audio", object())
+    ctx.provide("renderer", object())
+    try:
+        install_hot_reload(ctx, watch=False)
+        r = ctx.get("hot_reloader")
+        assert r is not None
+        assert os.path.isdir(r.primitives_dir), r.primitives_dir
+        assert os.path.basename(os.path.dirname(r.primitives_dir)) == "engine"
+    finally:
+        ctx.dispose()
+    print("[OK] 热重载插件：装配并暴露 engine/primitives 原语目录")
+
+
 if __name__ == "__main__":
     test_context()
     test_worldlog()
@@ -599,4 +758,10 @@ if __name__ == "__main__":
     test_hot_reload_threaded()
     test_hot_reload_manual_reload_event()
     test_hot_reload_plugin_wiring()
-    print("\n✅ 三件事冒烟 + 接线改造 + 热插拔/HMR 用例全过（16/16）")
+    test_primitive_reload_modified()
+    test_primitive_reload_dependency_order()
+    test_primitive_hotplug_added()
+    test_primitive_reload_failure_isolated()
+    test_primitive_hot_reload_auto_threaded()
+    test_hot_reload_plugin_wires_primitives()
+    print("\n✅ 三件事冒烟 + 接线改造 + 效果/原语热插拔 HMR 用例全过（22/22）")

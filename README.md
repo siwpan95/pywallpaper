@@ -74,6 +74,10 @@ main.pyw
 | `effect:hotplug_removed` | 运行时删除效果文件 | `(full_name)` |
 | `effect:themes_reloaded` | 背景主题表热更新 | `(names)` |
 | `effect:reload_requested` | 请求手动全量重载（托盘菜单触发） | — |
+| `primitive:reloaded` | 原语模块已热重载（修改） | `(module, names)` |
+| `primitive:added` | 运行时新增原语模块 | `(module, names)` |
+| `primitive:removed` | 运行时删除原语模块 | `(module, names)` |
+| `primitive:reload_failed` | 原语重载失败（不中断其余） | `(module, error)` |
 
 托盘菜单回调不再直改渲染器状态，而是 emit 事件由订阅者执行 —— 托盘线程与渲染主线程通过 Context 通信
 （Context 用 RLock 保护，跨线程 emit 安全）。
@@ -92,15 +96,28 @@ main.pyw
 - 支持：运行时新增/删除/修改效果（自动刷新可切换名列表）、`themes.json` 热更新、
   托盘菜单「🔄 重新加载效果」触发全量重扫。
 
+### Python 原语类热重载（2026-11-02 演进，含本次推进）
+
+`HotReloader` **同时监听 `engine/primitives/*.py`**。某原语源文件变更时，经 `importlib.reload`
+重新执行模块，其 `@register_primitive(name)` 装饰器自动把**新类写回中央字典
+`PRIMITIVE_REGISTRY`**。由于 `EngineEffect` 每帧经 `create_primitive(config)` 按 `type` 名字
+*实时* 查表取类，下一帧即使用新类 —— **注册表就是可靠的「重绑点」**，不存在被其他模块缓存的
+悬挂引用问题（已实测验证）。
+
+- **依赖感知的拓扑 reload**：用 `ast` 解析各原语模块的兄弟导入（如 `ca.py` → `ca_kernel`），
+  按依赖序重载「变更模块 + 其全部传递依赖方」，避免用到旧的兄弟实现。
+- **新增原语**：把新文件放入 `engine/primitives/`（含 `@register_primitive` 装饰类）即被
+  自动 `import_module` 并注册，无需改动 `__init__.py`。
+- **失败隔离**：syntax / import 错误的原语模块重载失败会 emit `primitive:reload_failed` 且
+  **不污染** `PRIMITIVE_REGISTRY` 的其他条目；其余模块照常热重载。
+- 与效果 HMR 共用同一监听线程与「主线程落地」模型，零锁、跨线程安全。
+
 用法：
 
 ```bash
-python main.pyw                      # GUI 模式默认开启热插拔（监听 effects/）
+python main.pyw                      # GUI 模式默认开启热插拔（同时监听 effects/ 与原语）
 python main.pyw --no-hot-reload     # 关闭监听（适合打包/性能敏感场景）
 ```
-
-设计取舍：Python 原语类（`engine/primitives/*.py`）的热重载需 `importlib.reload` 且无法可靠
-重绑已被其他模块持有的引用，故**本期不做**；效果数据层的 JSON HMR 已覆盖绝大多数日常迭代。
 
 ### 为什么不用官方 Cordis
 
