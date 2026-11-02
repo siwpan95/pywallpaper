@@ -79,17 +79,23 @@ class WallpaperRenderer:
         self.ctx = ctx
         self._muted = False
 
-        # 音频系统
+        # 音频系统：优先复用装配层提供的服务（避免出现第二份实例）
         print("[INIT] 创建 AudioSimulator...", flush=True)
-        self.audio = AudioSimulator()
+        if ctx is not None and ctx.has("audio"):
+            self.audio = ctx.get("audio")
+        else:
+            self.audio = AudioSimulator()
 
         # 性能监控
         self.perf = PerformanceMonitor()
 
-        # 效果管理
+        # 效果管理：必须与事件总线驱动的是同一个实例，否则事件切换不会反映到渲染
         print("[INIT] 创建 EffectManager...", flush=True)
         from systems.effect_manager import EffectManager
-        self.effect_manager = EffectManager(EFFECT_REGISTRY, self.config)
+        if ctx is not None and ctx.has("effect_manager"):
+            self.effect_manager = ctx.get("effect_manager")
+        else:
+            self.effect_manager = EffectManager(EFFECT_REGISTRY, self.config)
 
         # 背景主题
         self.bg_theme: Optional[BackgroundTheme] = None
@@ -133,8 +139,11 @@ class WallpaperRenderer:
         atexit.register(self.shutdown)
 
     def _init_music(self):
-        """生成并播放音乐"""
-        self.music = MusicPlaybackSystem(self.audio)
+        """生成并播放音乐（复用装配层提供的 music 服务，避免重复实例）"""
+        if self.ctx is not None and self.ctx.has("music"):
+            self.music = self.ctx.get("music")
+        else:
+            self.music = MusicPlaybackSystem(self.audio)
         self.music.generate_and_play()
 
     # ---- 状态控制（供事件驱动调用） ----

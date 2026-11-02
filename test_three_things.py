@@ -740,6 +740,30 @@ def test_hot_reload_plugin_wires_primitives():
     print("[OK] 热重载插件：装配并暴露 engine/primitives 原语目录")
 
 
+def test_renderer_shares_assembly_services():
+    """渲染器必须复用装配层的 audio / effect_manager / music 同一实例。
+
+    否则事件总线驱动的效果切换作用在「另一个」EffectManager 上，
+    真实渲染永远不切换效果（单元测试若只断言 ctx.get('effect_manager') 会漏掉）。
+    """
+    from core.assembly import EVENTS, build_context
+
+    ctx = build_context(silent=True, with_tray=False)
+    try:
+        renderer = ctx.get("renderer")
+        assert renderer.effect_manager is ctx.get("effect_manager"), "EffectManager 实例不一致"
+        assert renderer.audio is ctx.get("audio"), "AudioSimulator 实例不一致"
+        assert renderer.music is ctx.get("music"), "MusicPlaybackSystem 实例不一致"
+
+        # 事件驱动的切换必须作用到渲染器实际使用的那个 manager
+        ctx.emit(EVENTS.EFFECT_REQUESTED)
+        assert renderer.effect_manager.is_transitioning is True, "事件未作用到渲染器的 manager"
+        assert renderer.effect_manager.next_effect_name, renderer.effect_manager.next_effect_name
+    finally:
+        ctx.dispose()
+    print("[OK] 渲染器复用装配层服务（audio/effect_manager/music 同一实例）")
+
+
 if __name__ == "__main__":
     test_context()
     test_worldlog()
@@ -764,4 +788,5 @@ if __name__ == "__main__":
     test_primitive_reload_failure_isolated()
     test_primitive_hot_reload_auto_threaded()
     test_hot_reload_plugin_wires_primitives()
-    print("\n✅ 三件事冒烟 + 接线改造 + 效果/原语热插拔 HMR 用例全过（22/22）")
+    test_renderer_shares_assembly_services()
+    print("\n✅ 三件事冒烟 + 接线改造 + 效果/原语热插拔 HMR 用例全过（23/23）")

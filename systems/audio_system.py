@@ -8,6 +8,8 @@ import wave
 import struct
 import time
 import os
+import sys
+from array import array
 from datetime import datetime
 from typing import Optional
 
@@ -15,13 +17,34 @@ from ecs import System
 from data_loader import get_audio_data as _load_audio_data, get_config as _load_config
 
 # 尝试导入 pygame
+# 注意：不在模块导入时 init mixer —— 模块级副作用会让「进程内多次创建/销毁
+# Context」的场景在第一次 shutdown 后永久失去音频（mixer.quit 不可逆）。
+# 改为按需惰性初始化（_ensure_mixer），shutdown 后可再次 init。
 try:
     import pygame
-    pygame.mixer.init(frequency=44100, size=-16, channels=2, buffer=4096)
     _PYGAME_OK = True
 except Exception:
     pygame = None
     _PYGAME_OK = False
+
+_MIXER_PARAMS = dict(frequency=44100, size=-16, channels=2, buffer=4096)
+
+
+def _ensure_mixer() -> bool:
+    """确保 pygame mixer 已初始化（可重复调用）。返回是否可用。
+
+    mixer 被 shutdown() quit 掉后，此处会重新 init —— 保证同一进程内
+    多次创建/销毁 Context 时音频仍然可用。
+    """
+    if not _PYGAME_OK:
+        return False
+    try:
+        if pygame.mixer.get_init() is None:
+            pygame.mixer.init(**_MIXER_PARAMS)
+        return pygame.mixer.get_init() is not None
+    except Exception as e:
+        print(f"[AUDIO] mixer 初始化失败: {e}")
+        return False
 
 # 懒加载音频理论数据
 _audio_data = None
@@ -226,16 +249,25 @@ def mix_tracks(tracks: list) -> list:
 
 
 def samples_to_wav(samples: list, sample_rate: int, filepath: str, bit_depth: int = 16):
-    """将采样数据写入 WAV 文件"""
+    """将采样数据写入 WAV 文件（批量打包，一次 writeframes 写入）
+
+    性能要点：``wave.writeframes`` 每次调用都会 seek 回文件头重写 RIFF 头
+    （_patchheader），逐采样调用会让 100 万+ 采样点触发上百万次头重写
+    —— 实测 25.7 秒音频耗时 68 秒。这里改为先把全部采样打包成一个 bytes，
+    再一次性 writeframes，头重写从百万次降为 1 次。
+    """
     max_val = (2 ** (bit_depth - 1)) - 1
-    fmt = "<h" if bit_depth == 16 else "<i"
+    typecode = 'h' if bit_depth == 16 else 'i'
+    ints = array(typecode,
+                 (int(max(-1.0, min(1.0, s)) * max_val) for s in samples))
+    if sys.byteorder == 'big':   # array 用原生字节序，wave 期望小端
+        ints.byteswap()
+    data = ints.tobytes()
     with wave.open(filepath, "w") as wf:
         wf.setnchannels(1)
         wf.setsampwidth(bit_depth // 8)
         wf.setframerate(sample_rate)
-        for s in samples:
-            clamped = max(-1.0, min(1.0, s))
-            wf.writeframes(struct.pack(fmt, int(clamped * max_val)))
+        wf.writeframes(data)
 
 
 def generate_music_to_file(output_path: str = None,
@@ -316,8 +348,9 @@ def generate_music_to_file(output_path: str = None,
     mixed = [s * target / peak for s in mixed]
 
     if output_path is None:
-        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-        output_path = os.path.join(os.environ.get('TEMP', '.'), f"wallpaper_music_{ts}.wav")
+        # 固定文件名：每次启动都新建一个时间戳 WAV 会让 TEMP 目录无限堆积
+        # （实测跑测试数百次后残留 89 个文件），改为覆盖写入同一份即可。
+        output_path = os.path.join(os.environ.get('TEMP', '.'), "wallpaper_music.wav")
 
     samples_to_wav(mixed, sample_rate, output_path)
     duration_sec = len(mixed) / sample_rate
@@ -478,6 +511,7 @@ class MusicPlaybackSystem(System):
         self.audio_sim = audio_sim
         self.music_path: Optional[str] = None
         self.params: Optional[dict] = None
+        self._shutdown_done = False
 
     def generate_and_play(self, world=None):
         """生成音乐、加载到模拟器、开始播放"""
@@ -496,7 +530,7 @@ class MusicPlaybackSystem(System):
                 self.audio_sim.music_start_time = time.time()
                 print(f"[MUSIC] 乐谱已载入 AudioSimulator，时长 {dur:.1f}s")
 
-            if _PYGAME_OK:
+            if _ensure_mixer():
                 try:
                     pygame.mixer.music.load(music_path)
                     pygame.mixer.music.play(loops=-1)
@@ -519,6 +553,8 @@ class MusicPlaybackSystem(System):
         if not _PYGAME_OK:
             return
         try:
+            if pygame.mixer.get_init() is None:
+                return
             if pygame.mixer.music.get_busy():
                 pygame.mixer.music.stop()
                 pygame.mixer.music.unload()
@@ -527,11 +563,15 @@ class MusicPlaybackSystem(System):
             print(f"[MUSIC] 停止音乐时出错: {e}")
 
     def shutdown(self):
-        """完整关闭音频系统"""
+        """完整关闭音频系统（幂等 —— 渲染器与装配层都会调用）"""
+        if self._shutdown_done:
+            return
+        self._shutdown_done = True
         self.stop()
         if _PYGAME_OK:
             try:
-                pygame.mixer.quit()
+                if pygame.mixer.get_init() is not None:
+                    pygame.mixer.quit()
                 print("[MUSIC] pygame.mixer 已关闭")
             except Exception as e:
                 print(f"[MUSIC] 关闭 mixer 时出错: {e}")
