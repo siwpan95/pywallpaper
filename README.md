@@ -15,12 +15,39 @@ ECS 架构的音乐可视化动态壁纸系统，集成了 draw 项目的数学�
 
 ---
 
+## 发行版本
+
+### v1.1.0（2026-11-02）
+
+**新增**
+
+- **Context 可逆装配内核**：`core/context.py` 补齐 Cordis 语义 —— 插件生命周期（`install` → 独立卸载）、事件总线（`on/once/off/emit`，订阅随销毁自动退订、异常容错）、`inject` 依赖校验、`RLock` 线程安全、`snapshot()` 自省
+- **装配层** `core/assembly.py`（新）：各子系统作为插件装入 Context，`build_context()` 为生产入口；`main.pyw` 由裸装改为真装配，`--dump-profile` 输出真实注册表快照
+- **效果热插拔 / HMR** `core/hot_reload.py`（新）：监听线程只扫描入队、主渲染线程每帧 `consume_pending()` 落地 → **零锁**热替换
+  - 效果数据层：`effects/*.json` + `themes.json` 增删改即时生效
+  - **Python 原语类**：`engine/primitives/*.py` 亦可热重载 —— reload 后 `@register_primitive` 把新类写回中央 `PRIMITIVE_REGISTRY`，`create_primitive` 每帧实时查表，**下一帧即生效**；ast 解析兄弟导入做依赖感知拓扑 reload（`ca_kernel` 先于 `ca`），失败隔离不污染注册表
+- **事件族**：`effect:*` / `primitive:*` / `render:*` / `audio:*`，跨线程安全，统一入 WorldLog
+
+**修复**
+
+- **音频生成性能**：逐采样调 `wave.writeframes`（每次都 seek 回文件头重写 RIFF 头）→ 25.7s 音频触发上百万次头重写，生成耗时 **68.7s**；改为批量打包一次写入（输出逐字节一致）→ **1.7s**
+- **mixer 生命周期**：模块导入时的全局 `mixer.init()` 与不可逆的 `mixer.quit()` 导致同进程第二次创建 Context 永久失去音频 → 改为惰性 `_ensure_mixer()` + 幂等 shutdown；音乐输出改固定文件名，堵住 TEMP 无限堆积
+- **装配一致性**：渲染器自建 `AudioSimulator`/`EffectManager`，与装配层实例重复 → 事件驱动的效果切换作用在另一个实例上，**真实渲染不切换效果** → 改为复用 ctx 服务
+
+**验证**：Python 3.14.7 + pygame-ce 2.5.8 + numba 0.68.1 下，`test_three_things.py` **23/23**、`selfcheck.py` 通过、`test_engine.py` **5/5**
+
+### v1.0.0（2026-08-26）
+
+- 安装包样板（`pywallpaper.spec` + `pywallpaper.iss` + 引擎分流说明），Inno Setup 76.4MB 回环验证通过
+
+---
+
 ## 零、三件事 CLI（media_engine 阶段 A，2026-08-24 纯加法）
 
 - 装配自省：`python main.pyw --dump-profile`（effects/primitives/可选依赖清单 + **真实 Context 注册表快照**，agent 审计入口）
 - 任务日志审计：`python main.pyw --dump-log [日志路径]`（默认 data/logs/wallpaper.log，JSONL 与 WorldLog 同构）
 - 运行日志：启动即写 run_start/run_end 到 data/logs/wallpaper.log；内核 `core/context.py`（注册即回滚）与 `core/world_log.py` 内联自 alloy 引擎（复制优于共享）
-- 冒烟：`python test_three_things.py`（9/9，含接线改造后的新用例）
+- 冒烟：`python test_three_things.py`（23/23，含接线改造与效果/原语 HMR 新用例）
 
 ## 零·二、Context 装配（2026-11-02 接线改造）
 

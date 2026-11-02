@@ -23,7 +23,8 @@ ECS 架构音频可视化动态壁纸 = 事实上的统一媒体引擎：JSON �
 ## 常用命令
 - python main.pyw --dump-profile / --dump-log
 - python main.pyw --no-hot-reload（关闭效果热插拔监听）
-- python test_three_things.py（16/16）；python test_engine.py（需 PYTHONIOENCODING=utf-8，GBK 控制台 ✗ 会崩）
+- python test_three_things.py（23/23）；python test_engine.py（需 PYTHONIOENCODING=utf-8，GBK 控制台 ✗ 会崩）
+- 验收解释器固定用 `D:\Python314\python.exe`（Python 3.14.7 + pygame-ce 2.5.8 + numba 0.68.1）；WorkBuddy 自带的 python 3.13 环境**不能**作为验收依据
 - python selfcheck.py（无头自检）
 
 ## 装配约定（2026-11-02 接线改造）
